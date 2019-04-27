@@ -1,15 +1,15 @@
-import numpy as numpy
+import numpy as np
 import cv2
 
 
 def overlap_loss(predicted_grid, grid):
-	'''Calculate overlap loss between the agent and environement. It
-	works for: mazes, path planning
+    '''Calculate overlap loss between the agent and environement. It
+    works for: mazes, path planning
 
-	'''
+    '''
 
-	# Overlap predicted grid and environement grid
-    add = cv2.add(grid.T, ego_canvas)
+    # Overlap predicted grid and environement grid
+    add = cv2.add(grid.T, predicted_grid)
     # Check for colissions
     overlap = np.where(add == 2.)
     # Compute loss

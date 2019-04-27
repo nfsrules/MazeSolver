@@ -6,6 +6,7 @@ from mazelib import *
 from functions import *
 from tqdm import tqdm
 import numpy as np
+from tqdm import tqdm
 
 
 class TransformedDataset(Dataset):
@@ -109,9 +110,9 @@ class MazeExplorer(Dataset):
         path_planning = generate_path_planning(maze['grid'], maze['start'], maze['end'], maze['solutions'])
         path_planning = resize_grid(path_planning['grid'], (self.w, self.h))
 
-        # Generate entrance/end layer
-        entrances = generate_entrances(maze['grid'], maze['start'], maze['end'])
-        entrances = resize_grid(entrances['grid'], (self.w, self.h))
+        # Generate goals (entrance/exit) layer
+        goals = generate_entrances(maze['grid'], maze['start'], maze['end'])
+        goals = resize_grid(goals['grid'], (self.w, self.h))
 
         # Generate maze's solution / The solution is a sequence with all points (start to end)
         solution = get_solution(maze['solutions'], maze['start'], maze['end'])        
@@ -125,6 +126,26 @@ class MazeExplorer(Dataset):
         
         # Set agent size in reference to road width
         agent_size = int(road_width/2)
-        agent_size = (agent_size, agent_size)
+        #agent_size = (agent_size, agent_size)
 
-        return maze_grid, path_planning, entrances, agent_size, maze['upsampled_solution'], family
+        return maze_grid, path_planning, goals, agent_size, maze['upsampled_solution'], family
+
+
+    def get_dopping_percentage(self):
+        total_points = 0
+        total_collisions = 0
+
+        for i in tqdm(range(self.len())):
+            grid, path, goals, agent_size, solution, family = self[i]
+            collisions, total = check_trajectory(solution, grid, agent_size)
+            total_points = total_points + total
+            total_collisions = total_collisions + collisions
+            self.dopping = round((total_collisions/total_points)*100, 3)
+            
+        print('Estimated dopping percentage = ', self.dopping)
+
+        return self.dopping
+
+
+    def len(self):
+        return len(self.mazes)

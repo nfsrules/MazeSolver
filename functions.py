@@ -333,7 +333,7 @@ def sibling_mazes(maze, nbr_trajectories, w, h):
                     'end':maze['end'], 'solutions':maze['solutions'],
                     'upsampled_solution': s, 'expert': False
                     }
-
+                    
         s_mazes.append(aux)
 
     return np.array(s_mazes)
@@ -378,7 +378,7 @@ def predicted_grid(prediction, road_size, angle=90, canvas_size=(64,64)):
     return predicted_grid
 
 
-def check_trajectory2(trajectory, grid, road_size):
+def check_trajectory(trajectory, grid, road_size):
     '''Check how many points of a given trajectory
     are not consistent with the environment (collision)
     '''
