@@ -5,9 +5,6 @@ import matplotlib.pyplot as plt
 import cv2
 import math
 from skimage.transform import resize
-from IPython import display
-import time
-from losses import *
 
 
 
@@ -16,8 +13,17 @@ from losses import *
 small = [(3,3), (4,4)]    # upsampling factor 3
 medium = [(5,5), (6,6)]   # upsampling factor 2
 large = [(7,7), (8,8)]    # upsampling factor 1.5
-    
 
+
+def showPNG(grid, axis=False):
+    """Generate a simple image of the maze."""
+    plt.figure(figsize=(10, 5))
+    plt.imshow(grid, cmap=plt.cm.binary, interpolation='nearest')
+    if not axis:
+        plt.xticks([]), plt.yticks([])
+    plt.show()
+    
+    
 def generate_mazes(maze_size, nbr_mazes, nbr_entrances):
     '''Generate family of unique mazes of the same size.
     maze: maze instance
@@ -33,7 +39,7 @@ def generate_mazes(maze_size, nbr_mazes, nbr_entrances):
     # Set a generator
     m.generator = Prims(w,h)
     # Set a solver
-    m.solver = shortestPath()
+    m.solver = WallFollower()
     
     return m.generate_monte_carlo(nbr_mazes, nbr_entrances)
 
@@ -87,7 +93,6 @@ def clear_maze_entrances(grid, start, end):
 
 def get_solution(solution, start, end):
     '''Get solution sequence as numpy array
-
     '''
     start = np.array(start)
     end = np.array(end)
@@ -242,8 +247,6 @@ def perturbate(mean, road_size, nbr_samples=1):
 
 
 def perturbate_trajectory(solution, road_size):
-    '''Generate a perturbated trajectory from an example
-    '''
     trajectory = [perturbate(x,road_size) for x in solution]
     return np.array(trajectory).reshape(-1,2)
 
@@ -255,10 +258,7 @@ def generate_family_trajectories(solution, nbr, road_size):
     road_size: road size in pixels (allows to estimate covariance matrix)
     
     '''
-    family = [perturbate_trajectory(solution, road_size) for i in range(nbr)]
-    solution = solution.reshape(-1, solution.shape[0], 2)
-    solution = np.concatenate((solution, np.array(family)), axis=0)
-    return solution
+    return [perturbate_trajectory(solution, road_size) for i in range(nbr)]
 
 
 def plot_trajectories(grid, family):
@@ -283,7 +283,6 @@ def plot_solution(grid, solution):
     '''Plot maze an a single solution
     
     '''
-    plt.figure(figsize=(10, 10))
     plt.imshow(grid, cmap=plt.cm.binary, 
            interpolation='nearest', 
            origin='lower')
@@ -293,104 +292,4 @@ def plot_solution(grid, solution):
     plt.xlim((0,grid.shape[0]-1))
     plt.ylim((0,grid.shape[1]-1))
     plt.axis('off')
-
-
-def showPNG(grid, axis=False):
-    """Generate a simple image of the maze."""
-    plt.figure(figsize=(10, 10))
-    plt.imshow(grid, cmap=plt.cm.binary, interpolation='nearest', 
-                origin='lower')
-    if not axis:
-        plt.xticks([]), plt.yticks([])
-    plt.show()
     
-
-def sibling_mazes(maze, nbr_trajectories, w, h):
-    # Generate path planning
-    path_planning = generate_path_planning(maze['grid'], maze['start'], maze['end'], maze['solutions'])
-    path_planning = resize_grid(path_planning['grid'], (w, h))
-
-    # Generate maze's solution / The solution is a sequence with all points (start to end)
-    solution = get_solution(maze['solutions'], maze['start'], maze['end'])        
-    solution = upsample_trajectory(solution, (w, h), maze['grid'].shape)
-
-    # Estimate agent size in reference to road
-    road_width = estimate_road_width(path_planning)
-
-    # Generate family of solutions / concatenate with solutions
-    family = generate_family_trajectories(solution, nbr_trajectories, road_width)
-
-    # Generate siblings maze
-    s_mazes = []
-    for idx, s in enumerate(family):
-        if idx == 0:  # expert trajectory True
-            aux = {'grid':maze['grid'], 'start':maze['start'], 
-                    'end':maze['end'], 'solutions':maze['solutions'],
-                    'upsampled_solution': s, 'expert': True
-                    }
-        else:   #. Synthetic trajectory
-            aux = {'grid':maze['grid'], 'start':maze['start'], 
-                    'end':maze['end'], 'solutions':maze['solutions'],
-                    'upsampled_solution': s, 'expert': False
-                    }
-
-        s_mazes.append(aux)
-
-    return np.array(s_mazes)
-
-
-def play_raw_data(grid, solution, road_size, canvas_size=(64,64)):
-    """Plot raw data.
-
-    """
-    plt.figure(figsize=(10, 10))
-    fig, ax = plt.subplots(1)
-    l = int(road_size/2)
-    w = int(road_size/2)
-    for i, pixel in enumerate(solution): 
-        # Get predicted canvas with ego pose
-        ego_canvas = predicted_grid(pixel, road_size, canvas_size=canvas_size)
-        # grid + canvas
-        add = cv2.add(grid.T, ego_canvas)
-        
-        # Display image
-        display.clear_output(wait=True)
-        display.display(plt.gcf())
-        plt.imshow(add, cmap=plt.cm.binary)
-        plt.axis('off')
-        time.sleep(1)
-
-        # Calculate overlap loss and show in it title
-        plt.title('Overlap loss function {}'.format(overlap_loss(ego_canvas,grid)))
-    plt.close()
-
-
-def predicted_grid(prediction, road_size, angle=90, canvas_size=(64,64)):
-    # Estimate agent size as the half of the road size
-    w, l = (int(road_size/2), int(road_size/2))
-    # Unpack prediction
-    x, y = prediction
-    # Draw polygon and project into an empty canvas
-    polygon = polygon_from_ego((x,y),angle=angle,l=l,w=w)
-    canvas = np.zeros(canvas_size)
-    predicted_grid = draw_egopose(canvas, polygon)
-
-    return predicted_grid
-
-
-def check_trajectory2(trajectory, grid, road_size):
-    '''Check how many points of a given trajectory
-    are not consistent with the environment (collision)
-    '''
-    collision_count = 0
-    for pixel in trajectory:
-        # Get predicted canvas
-        ego_canvas = predicted_grid(pixel, road_size, angle=90)
-        # Check if ego canvas and environment overlaps
-        add = cv2.add(grid.T, ego_canvas)
-        collisions = np.where(add == 2.)
-        if collisions[0].any():  # Overlap detected
-            collision_count += 1
-            
-    return collision_count, len(trajectory)
-     
