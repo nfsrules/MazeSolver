@@ -120,14 +120,12 @@ class MazeExplorer(Dataset):
 
         # Estimate agent size in reference to road
         road_width = estimate_road_width(path_planning)
+          # Set agent size in reference to road width
+        agent_size = int(road_width/2)
 
         # Generate family of solutions / concatenate with solutions / only to visualize
         family = generate_family_trajectories(solution, self.nbr_trajectories, road_width)
         
-        # Set agent size in reference to road width
-        agent_size = int(road_width/2)
-        #agent_size = (agent_size, agent_size)
-
         return maze_grid, path_planning, goals, agent_size, maze['upsampled_solution'], family
 
 
@@ -141,7 +139,6 @@ class MazeExplorer(Dataset):
             total_points = total_points + total
             total_collisions = total_collisions + collisions
             self.dopping = round((total_collisions/total_points)*100, 3)
-            
         print('Estimated dopping percentage = ', self.dopping)
 
         return self.dopping
