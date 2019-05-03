@@ -144,11 +144,6 @@ class Maze(object):
         # based on optional parameter, choose the maze of the correct difficulty
         posi = int((len(mazes) - 1) * difficulty)
 
-        # save final results of Monte Carlo Simulations to this object
-        #self.grid = mazes[posi]['grid']
-        #self.start = mazes[posi]['start']
-        #self.end = mazes[posi]['end']
-        #self.solutions = mazes[posi]['solutions']
         return mazes
 
     def solve(self):

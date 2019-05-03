@@ -1,24 +1,32 @@
-import numpy as np
-import cv2
+import torch
+import torch.nn as nn
 
 
-def overlap_loss(predicted_grid, grid):
-    '''Calculate overlap loss between the agent and environement. It
-    works for: mazes, path planning
+class RMSELoss(nn.Module):
+    def __init__(self, eps=1e-10):
+        super().__init__()
+        self.mse = nn.MSELoss()
+        self.eps = eps
 
-    '''
+    def forward(self, prediction, target):
+        return torch.sqrt(self.mse(prediction, target) + self.eps)
 
-    # Overlap predicted grid and environement grid
-    add = cv2.add(grid.T, predicted_grid)
-    # Check for colissions
-    overlap = np.where(add == 2.)
-    # Compute loss
-    ## Number of overlaped pixels: m2 of overlapping ego + env
-    if overlap[0].any(): # Overlap exist
-        loss = len(overlap[0])  # Save number of colliding pixels as loss
-    else:  # No overlap
-        loss = 0
-    ### Shall we add some kind of spatial smooth factor?
-    ### Shall it be different on path planning & goals loss?
-    return loss
+
+class GraphicLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, prediction, target):
+        add_grid = torch.add(prediction, target)
+        return torch.sum(add_grid == 2.)
+
+
+def cross_entropy_one_hot(input, target):
+    _, labels = target.max(dim=1)
+    return nn.CrossEntropyLoss()(input, labels)
+
+
+def soft_cross_entropy(pred, soft_targets):
+    logsoftmax = nn.LogSoftmax(dim=1)
+    return torch.mean(torch.sum(- soft_targets * logsoftmax(pred), 1))
 

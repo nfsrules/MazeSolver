@@ -40,7 +40,7 @@ def xy_transform(dp):
 
 class MazeExplorer(Dataset):
     
-    def __init__(self, maze_size=(64,64), nbr_instances=3000, agent_size=(3,3), difficulty='mixed', nbr_trajectories=20, generator='prims', solver='shortestpath'):
+    def __init__(self, maze_size=(64,64), nbr_instances=3000, agent_size=(3,3), difficulty='mixed', nbr_trajectories=20, generator='prims', solver='shortestpath', alpha=2):
         self.w, self.h = maze_size
         self.nbr_instances = nbr_instances
         self.difficulty = difficulty
@@ -49,6 +49,7 @@ class MazeExplorer(Dataset):
         self.nbr_entrances = 3   # not sure, let's keep it fix
         self.agent_size = agent_size
         self.nbr_trajectories = nbr_trajectories
+        self.alpha = alpha
 
         if self.difficulty == 'mixed' or self.difficulty == 'hard' or self.difficulty == 'medium' or self.difficulty == 'easy':
             print('Creating MazeExplorer dataset of difficulty {}'.format(self.difficulty))
@@ -88,7 +89,7 @@ class MazeExplorer(Dataset):
             aux = m.generate_monte_carlo(nbr_instances_by_difficulty, self.nbr_entrances)
             # Generate set of 'sibling' mazes with perturbed trajectories
             # One maze is converted to nbr_trajectories
-            s_aux = [sibling_mazes(x, self.nbr_trajectories, self.w, self.h) for x in aux]
+            s_aux = [sibling_mazes(x, self.nbr_trajectories, self.w, self.h, self.alpha) for x in aux]
             s_aux = np.concatenate(np.array(s_aux), axis=0)
             # Append family of mazes
             mazes.append(s_aux)
@@ -115,18 +116,18 @@ class MazeExplorer(Dataset):
         goals = resize_grid(goals['grid'], (self.w, self.h))
 
         # Generate maze's solution / The solution is a sequence with all points (start to end)
-        solution = get_solution(maze['solutions'], maze['start'], maze['end'])        
-        solution = upsample_trajectory(solution, (self.w, self.h), maze['grid'].shape)
+        #solution = get_solution(maze['solutions'], maze['start'], maze['end'])        
+        #solution = upsample_trajectory(solution, (self.w, self.h), maze['grid'].shape)
 
         # Estimate agent size in reference to road
-        road_width = estimate_road_width(path_planning)
+        #road_width = estimate_road_width(path_planning)
           # Set agent size in reference to road width
-        agent_size = int(road_width/2)
+        #agent_size = int(road_width/2)
 
         # Generate family of solutions / concatenate with solutions / only to visualize
-        family = generate_family_trajectories(solution, self.nbr_trajectories, road_width)
+        #family = generate_family_trajectories(solution, self.nbr_trajectories, road_width)
         
-        return maze_grid, path_planning, goals, agent_size, maze['upsampled_solution'], family
+        return maze_grid, path_planning, goals, maze['upsampled_solution']#, family
 
 
     def get_dopping_percentage(self):

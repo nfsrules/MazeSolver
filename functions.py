@@ -232,30 +232,30 @@ def estimate_road_width(path_planning):
     return np.unique(np.stack((road_size_x, road_size_y)))[1]
 
 
-def perturbate(mean, road_size, nbr_samples=1, factor=2):
+def perturbate(mean, road_size, nbr_samples=1, alpha=2):
     '''Perturbate point with 2D noise of mean (px,py)
     and covariance road_size/2 in both axis
     '''
-    cov = [[road_size/factor, 0],[0, road_size/factor]]
+    cov = [[road_size/alpha, 0],[0, road_size/alpha]]
     x, y = np.random.multivariate_normal(mean, cov, nbr_samples).T
     return np.array([x, y]).reshape(-1,2)
 
 
-def perturbate_trajectory(solution, road_size, nbr_samples=1, factor=5):
+def perturbate_trajectory(solution, road_size, nbr_samples=1, alpha=2):
     '''Generate a perturbated trajectory from an example
     '''
-    trajectory = [perturbate(x,road_size, nbr_samples, factor) for x in solution]
+    trajectory = [perturbate(x,road_size, nbr_samples, alpha) for x in solution]
     return np.array(trajectory).reshape(-1,2)
 
 
-def generate_family_trajectories(solution, nbr, road_size, factor=7):
+def generate_family_trajectories(solution, nbr, road_size, alpha=2):
     '''Generate a family of trajectories (valid and non valid)
     solution: average optimal solution
     nbr: number of trajectories to generate
     road_size: road size in pixels (allows to estimate covariance matrix)
     
     '''
-    family = [perturbate_trajectory(solution, road_size, factor=factor) for i in range(nbr)]
+    family = [perturbate_trajectory(solution, road_size, alpha=alpha) for i in range(nbr)]
     solution = solution.reshape(-1, solution.shape[0], 2)
     solution = np.concatenate((solution, np.array(family)), axis=0)
     return solution
@@ -305,7 +305,7 @@ def showPNG(grid, axis=False):
     plt.show()
     
 
-def sibling_mazes(maze, nbr_trajectories, w, h):
+def sibling_mazes(maze, nbr_trajectories, w, h, alpha=2):
     # Generate path planning
     path_planning = generate_path_planning(maze['grid'], maze['start'], maze['end'], maze['solutions'])
     path_planning = resize_grid(path_planning['grid'], (w, h))
@@ -318,7 +318,7 @@ def sibling_mazes(maze, nbr_trajectories, w, h):
     road_width = estimate_road_width(path_planning)
 
     # Generate family of solutions / concatenate with solutions
-    family = generate_family_trajectories(solution, nbr_trajectories, road_width)
+    family = generate_family_trajectories(solution, nbr_trajectories, road_width, alpha)
 
     # Generate siblings maze
     s_mazes = []
@@ -339,10 +339,11 @@ def sibling_mazes(maze, nbr_trajectories, w, h):
     return np.array(s_mazes)
 
 
-def play_raw_data(grid, solution, road_size, canvas_size=(64,64)):
+def play_raw_data(grid, solution, canvas_size=(64,64)):
     """Plot raw data.
 
     """
+    road_size = estimate_road_width(grid)
     plt.figure(figsize=(10, 10))
     fig, ax = plt.subplots(1)
     l = int(road_size/2)
