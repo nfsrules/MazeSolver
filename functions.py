@@ -8,7 +8,7 @@ from skimage.transform import resize
 from IPython import display
 import time
 from losses import *
-
+from losses_numpy import *
 
 
 # List of maze sizes

@@ -40,14 +40,13 @@ def xy_transform(dp):
 
 class MazeExplorer(Dataset):
     
-    def __init__(self, maze_size=(64,64), nbr_instances=3000, agent_size=(3,3), difficulty='mixed', nbr_trajectories=20, generator='prims', solver='shortestpath', alpha=2):
+    def __init__(self, maze_size=(64,64), nbr_instances=3000, difficulty='mixed', nbr_trajectories=20, generator='prims', solver='shortestpath', alpha=2):
         self.w, self.h = maze_size
         self.nbr_instances = nbr_instances
         self.difficulty = difficulty
         self.generator = generator
         self.solver = solver
         self.nbr_entrances = 3   # not sure, let's keep it fix
-        self.agent_size = agent_size
         self.nbr_trajectories = nbr_trajectories
         self.alpha = alpha
 
@@ -88,7 +87,7 @@ class MazeExplorer(Dataset):
             # Generate a group of unique mazes using MonteCarlo simulations
             aux = m.generate_monte_carlo(nbr_instances_by_difficulty, self.nbr_entrances)
             # Generate set of 'sibling' mazes with perturbed trajectories
-            # One maze is converted to nbr_trajectories
+            # For each maze in 'aux' we generate nbr_trajectories versionss
             s_aux = [sibling_mazes(x, self.nbr_trajectories, self.w, self.h, self.alpha) for x in aux]
             s_aux = np.concatenate(np.array(s_aux), axis=0)
             # Append family of mazes
@@ -135,15 +134,19 @@ class MazeExplorer(Dataset):
         total_collisions = 0
 
         for i in tqdm(range(self.len())):
-            grid, path, goals, agent_size, solution, family = self[i]
-            collisions, total = check_trajectory(solution, grid, agent_size)
+            grid, path, goals, solution = self[i]
+            road_size = estimate_road_width(grid)
+            #w, l = (int(road_size/2), int(road_size/2))
+            collisions, total = check_trajectory(solution, grid, road_size)
             total_points = total_points + total
             total_collisions = total_collisions + collisions
             self.dopping = round((total_collisions/total_points)*100, 3)
-        print('Estimated dopping percentage = ', self.dopping)
 
+        print('Estimated dopping percentage = ', self.dopping)
         return self.dopping
 
 
     def len(self):
         return len(self.mazes)
+
+
