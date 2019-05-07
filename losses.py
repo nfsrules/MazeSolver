@@ -18,7 +18,7 @@ class GraphicLoss(nn.Module):
 
     def forward(self, prediction, target):
         add_grid = torch.add(prediction.t(), target)
-        return torch.sum(add_grid == 2.)
+        return torch.sum(add_grid == 2.).float()
 
 
 def cross_entropy_one_hot(input, target):

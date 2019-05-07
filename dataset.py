@@ -22,13 +22,23 @@ class TransformedDataset(Dataset):
         return self.xy_transform(self.ds[index])
 
 
-def xy_transform(dp):
+def xy_transform(instance):
     '''Build X,Y pairs from Dataset class.
     X: 3 channel tensor
     Y: Center of the box
     '''
-    c, x, y, s = dp
-    return x, y[0,:]
+    X, path, goals, Y, expert_flag = instance
+
+    # Correct Y to fixed lenght (50)
+    ## This is a hack :((
+    if Y.shape[0] <= 50:
+        end = Y[-1]
+        while Y.shape[0] <= 49:
+            Y = np.vstack((Y, end))
+    else:
+        print('alert >50')
+
+    return X.reshape(1, X.shape[0], X.shape[1]), Y, path, goals, expert_flag
 
 # Generate a random maze each time you access the get_item method
 # generate thousands of mazes during the init
