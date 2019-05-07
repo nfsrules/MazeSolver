@@ -77,11 +77,6 @@ class MazeExplorer(Dataset):
         # Number of mazes by each difficulty 
         nbr_instances_by_difficulty = int(self.nbr_instances / len(self.difficulty))
 
-        # Number of valid/non valid trajectories to generate
-        # We start from a 50%/50% assumption
-        nbr_non_valid = int(self.nbr_trajectories/2)
-        nbr_valid = int(self.nbr_trajectories - nbr_non_valid)
-
         # Create one instance for each difficulty level
         mazes = []
         for size in self.difficulty:
@@ -92,21 +87,11 @@ class MazeExplorer(Dataset):
             # Generate a group of unique mazes using MonteCarlo simulations
             aux = m.generate_monte_carlo(nbr_instances_by_difficulty, self.nbr_entrances)
             # Generate set of 'sibling' mazes with perturbed trajectories
-            # For each maze in 'aux' we generate nbr_trajectories versions
-            # Each generated trajectory is a possible/ non possible solution
-            # Case 1: Perturbated trajectories (controlled by alpha) / non-expert trajectories 
-            #s_aux = [sibling_mazes(x, self.nbr_trajectories, self.w, self.h, self.alpha) for x in aux]
-            s_aux_non_valid = [sibling_mazes(x, nbr_non_valid, self.w, self.h, self.alpha) for x in aux]
-            s_aux_non_valid = np.concatenate(np.array(s_aux_non_valid), axis=0)
-
-            # Case 2; Perturbating trajectories (slightly) still remains as expert trajectories
-            # alpha=15 is normally enought for rejecting only 1% of the generated trajectories
-            s_aux_valid = [sibling_mazes_expert(x, nbr_valid, self.w, self.h, 15) for x in aux]
-            s_aux_valid = np.concatenate(np.array(s_aux_valid), axis=0)
-
+            # For each maze in 'aux' we generate nbr_trajectories versionss
+            s_aux = [sibling_mazes(x, self.nbr_trajectories, self.w, self.h, self.alpha) for x in aux]
+            s_aux = np.concatenate(np.array(s_aux), axis=0)
             # Append family of mazes
-            mazes.append(s_aux_non_valid)
-            mazes.append(s_aux_valid)
+            mazes.append(s_aux)
 
         mazes = np.concatenate(np.array(mazes), axis=0)
 
@@ -141,7 +126,7 @@ class MazeExplorer(Dataset):
         # Generate family of solutions / concatenate with solutions / only to visualize
         #family = generate_family_trajectories(solution, self.nbr_trajectories, road_width)
         
-        return maze_grid, path_planning, goals, maze['upsampled_solution'], maze['expert']#, family
+        return maze_grid, path_planning, goals, maze['upsampled_solution']#, family
 
 
     def get_dopping_percentage(self):
@@ -149,7 +134,7 @@ class MazeExplorer(Dataset):
         total_collisions = 0
 
         for i in tqdm(range(self.len())):
-            grid, path, goals, solution, expert_flag = self[i]
+            grid, path, goals, solution = self[i]
             road_size = estimate_road_width(grid)
             #w, l = (int(road_size/2), int(road_size/2))
             collisions, total = check_trajectory(solution, grid, road_size)
@@ -161,21 +146,7 @@ class MazeExplorer(Dataset):
         return self.dopping
 
 
-    def get_dopping_percentage_trajectories(self):
-        dopping_counter = 0
-        for i in tqdm(range(self.len())):
-            grid, path, goals, solution, expert_flag = self[i]
-            if expert_flag == False:
-                dopping_counter = dopping_counter + 1
-        self.dopping = round((dopping_counter/self.len())*100,3)
-        print('Estimated dopping percentage = ', self.dopping)
-
-
     def len(self):
         return len(self.mazes)
-
-
-    #def save(sel, directory='.'):
-    #    self.mazes
 
 

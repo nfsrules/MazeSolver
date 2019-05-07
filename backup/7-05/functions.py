@@ -306,10 +306,6 @@ def showPNG(grid, axis=False):
     
 
 def sibling_mazes(maze, nbr_trajectories, w, h, alpha=2):
- 
-    maze_grid = clear_maze_entrances(maze['grid'], maze['start'], maze['end'])
-    maze_grid = resize_grid(maze_grid['grid'], (w, h))
-     
     # Generate path planning
     path_planning = generate_path_planning(maze['grid'], maze['start'], maze['end'], maze['solutions'])
     path_planning = resize_grid(path_planning['grid'], (w, h))
@@ -319,74 +315,24 @@ def sibling_mazes(maze, nbr_trajectories, w, h, alpha=2):
     solution = upsample_trajectory(solution, (w, h), maze['grid'].shape)
 
     # Estimate agent size in reference to road
-    road_size = estimate_road_width(path_planning)
+    road_width = estimate_road_width(path_planning)
 
     # Generate family of solutions / concatenate with solutions
-    family = generate_family_trajectories(solution, nbr_trajectories, road_size, alpha)
+    family = generate_family_trajectories(solution, nbr_trajectories, road_width, alpha)
 
     # Generate siblings maze
     s_mazes = []
     for idx, s in enumerate(family):
-        if idx == 0:  # expert trajectory True / always the first solution in the list
+        if idx == 0:  # expert trajectory True
             aux = {'grid':maze['grid'], 'start':maze['start'], 
                     'end':maze['end'], 'solutions':maze['solutions'],
                     'upsampled_solution': s, 'expert': True
                     }
-        else:   #. Synthetic trajectories
-            # Check if collisions exist
-            nbr_collisions, total_points = check_trajectory(s, maze_grid, road_size)
-            # If collisions exists keep the generated trajectory
-            # Else just discard it
-            if nbr_collisions != 0:
-                aux = {'grid':maze['grid'], 'start':maze['start'], 
-                        'end':maze['end'], 'solutions':maze['solutions'],
-                        'upsampled_solution': s, 'expert': False
-                        }
-
-        s_mazes.append(aux)
-
-    return np.array(s_mazes)
-
-
-def sibling_mazes_expert(maze, nbr_trajectories, w, h, alpha=15):
-    '''Generate family of valid expert trajectories. Alpha=15 produced 1% 
-    of rejected trajectories.
-    '''
-    maze_grid = clear_maze_entrances(maze['grid'], maze['start'], maze['end'])
-    maze_grid = resize_grid(maze_grid['grid'], (w, h))
-       
-    # Generate path planning
-    path_planning = generate_path_planning(maze['grid'], maze['start'], maze['end'], maze['solutions'])
-    path_planning = resize_grid(path_planning['grid'], (w, h))
-
-    # Generate maze's solution / The solution is a sequence with all points (start to end)
-    solution = get_solution(maze['solutions'], maze['start'], maze['end'])        
-    solution = upsample_trajectory(solution, (w, h), maze['grid'].shape)
-
-    # Estimate agent size in reference to road
-    road_size = estimate_road_width(path_planning)
-
-    # Generate family of solutions / concatenate with solutions
-    family = generate_family_trajectories(solution, nbr_trajectories, road_size, alpha)
-
-    # Generate siblings maze
-    s_mazes = []
-    for idx, s in enumerate(family):
-        # Verify if the trajectory is 'expert' or not
-        nbr_collisions, total_points = check_trajectory(s, maze_grid, road_size)
-
-        if nbr_collisions == 0:  # expert trajectory True / always the first solution in the list
+        else:   #. Synthetic trajectory
             aux = {'grid':maze['grid'], 'start':maze['start'], 
                     'end':maze['end'], 'solutions':maze['solutions'],
-                    'upsampled_solution': s, 'expert': True
+                    'upsampled_solution': s, 'expert': False
                     }
-        # All non-expert trajectories are rejected
-        #else:   #. Reject trajectories that are not valid
-            #print('rejected trajectory') 
-            #aux = {'grid':maze['grid'], 'start':maze['start'], 
-            #        'end':maze['end'], 'solutions':maze['solutions'],
-            #        'upsampled_solution': s, 'expert': False
-            #        }
 
         s_mazes.append(aux)
 
@@ -449,39 +395,3 @@ def check_trajectory(trajectory, grid, road_size):
             
     return collision_count, len(trajectory)
      
-
-def draw_goals_canvas(grid, solution):
-    '''Generates a canvas with start and ending points of a trajectory
-    
-    '''
-    # Create empty canvas (1: non drivable)
-    canvas = np.zeros_like(grid)
-    road_size = estimate_road_width(grid)
-    w, l = (int(road_size/2), int(road_size/2))
-    
-    # Get start and ending points
-    start = solution[0]
-    end = solution[-1]
-    
-    for point in [start, end]:
-            polygon = polygon_from_ego(point, angle=90, l=l, w=w)
-            cv2.drawContours(canvas, [polygon], 0, (1,0,0), -1)  #  1: agent present (polygon)  
-
-    return canvas
-
-
-def draw_solution_canvas(grid, solution):
-    '''Generates a canvas with a desired trajectory
-    
-    '''
-    # Create empty canvas (1: non drivable)
-    canvas = np.zeros_like(grid)
-    road_size = estimate_road_width(grid)
-    w, l = (int(road_size/2), int(road_size/2))
-    
-    # Get start and ending points
-    for point in solution:
-            polygon = polygon_from_ego(point, angle=90, l=l, w=w)
-            cv2.drawContours(canvas, [polygon], 0, (1,0,0), -1)  #  1: agent present (polygon)  
-
-    return canvas

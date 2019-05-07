@@ -17,7 +17,7 @@ class GraphicLoss(nn.Module):
         super().__init__()
 
     def forward(self, prediction, target):
-        add_grid = torch.add(prediction.t(), target)
+        add_grid = torch.add(prediction, target)
         return torch.sum(add_grid == 2.)
 
 
