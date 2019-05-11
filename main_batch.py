@@ -50,7 +50,7 @@ train_me = Subset(t_me, indices=train_indexes)
 test_me = Subset(t_me, indices=test_indexes)
 
 # Configure dataloaders
-batch_size = 1
+batch_size = 16
 num_workers = 4
 
 trainloader = DataLoader(train_me, shuffle=True, 
@@ -84,47 +84,44 @@ for epoch in range(1, epochs+1):
     total_env = 0.0
     total_rmse = 0.0
 
-    for batch_idx, (data, target, path, goals, expert_flag) in enumerate(trainloader):
+    for batch_idx, (grid, target, path, goal, expert_flag) in enumerate(trainloader):
         # Convert X, Y to Torch variables
-        grid = data   # save numpy version of maze grid
-
+        #grid = data   # save numpy version of maze grid
+        grid, target, path, goal, expert_flag = grid.to(device), target.to(device), path.to(device), goal.to(device), expert_flag.to(device)
         # Convert input and target to tensors
-        data, target = Variable(data), Variable(target)
-        data, target = data.to(device).float(), target.to(device).float()
+        grid, target = Variable(grid), Variable(target)
+        grid, target = grid.to(device).float(), target.to(device).float()
  
         # Set gradient to zero
         optimizer.zero_grad()
 
         # Get network output
-        output = net(data)
+        output = net(grid)
 
-        # RMSE loss
+        # RMSE loss / batch ready
         rmse_loss = rmse(output, target)
 
-        # Environmental Loss
-        grid = grid[0][0].detach().numpy()
-        path = path[0].detach().numpy()
-        goals = goals[0].detach().numpy()
-        output = output[0].detach().cpu().numpy()
+        # Grid Loss / Vectorized version
+        # Generate grids from predictions 
+        pred_grids = torch.tensor([draw_solution_canvas(x[0], y) for x in grid 
+                                    for y in output]).to(device)
 
-        # Reconstruct predicted grids
-        pred_grid = torch.tensor(draw_solution_canvas(grid, output)).double().to(device)
-        pred_path = torch.tensor(draw_solution_canvas(path, output)).double().to(device)
-        pred_goals = torch.tensor(draw_goals_canvas(grid, output)).double().to(device)
-
-        # Compute graphic losses
-        # Wall loss
-        wall_loss = graphic_loss(torch.tensor(grid).to(device), pred_grid)
-        # Path planning loss 
-        path_loss = graphic_loss(torch.tensor(path).to(device), pred_path)
-        #path_loss = abs(wall_loss-path_loss)
-        # Goals loss
-        goal_loss = graphic_loss(torch.tensor(goals).to(device), pred_goals)
-        # Non-expert trajectory loss
-        env_loss = Variable((wall_loss + path_loss + goal_loss), requires_grad=True)/10 #
+        pred_paths = torch.tensor([draw_solution_canvas(x, y) for x in path
+                                    for y in output]).to(device)
         
-        # Final loss
-        loss = rmse_loss + env_loss + rmse_loss
+        pred_goals = torch.tensor([draw_goals_canvas(x, y) for x in goal 
+                                    for y in output]).to(device)
+
+        # Compute losses
+        wall_loss = [graphic_loss(y_true, y_pred) for y_true in grid for y_pred in pred_grids]
+        path_loss = [graphic_loss(y_true, y_pred) for y_true in path for y_pred in pred_paths]
+        goal_loss = [graphic_loss(y_true, y_pred) for y_true in goal for y_pred in pred_goals]
+
+        env_loss = Variable((torch.tensor(wall_loss).mean() + 
+                             torch.tensor(path_loss).mean() + 
+                             torch.tensor(goal_loss).mean()), requires_grad=True)/10 #
+ 
+        loss = rmse_loss + env_loss.to(device)
     
         # Backpropagate loss & udpate gradient
         loss.backward()
@@ -136,7 +133,7 @@ for epoch in range(1, epochs+1):
         total_rmse+= rmse_loss
 
         print('Train Epoch: {} [{}/{} ({:.0f}%)] EnvLoss: {:.6f}  RMSELoss: {:.6f} TotalLoss: {:.6f}'.format(
-                    epoch, batch_idx, len(trainloader.dataset),
+                    epoch, batch_idx*batch_size, len(trainloader.dataset),
                     100. * (batch_idx) / len(trainloader), 
                     total_env/len(trainloader), 
                     total_rmse/len(trainloader),

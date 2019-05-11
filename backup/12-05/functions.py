@@ -7,7 +7,7 @@ import math
 from skimage.transform import resize
 from IPython import display
 import time
-#from losses import *
+from losses import *
 from losses_numpy import *
 
 
@@ -272,7 +272,7 @@ def plot_trajectories(grid, family):
            origin='lower')
 
     for i in range(len(family)):
-        plt.plot(family[i][:,0], family[i][:,1])
+        plt.plot(family[i][:,1], family[i][:,0])
         
     plt.xlim((0,grid.shape[0]-1))
     plt.ylim((0,grid.shape[1]-1))
@@ -288,7 +288,7 @@ def plot_solution(grid, solution):
            interpolation='nearest', 
            origin='lower')
 
-    plt.scatter(solution[:, 0], solution[:, 1],s=10 , c='r', marker='+')
+    plt.scatter(solution[:, 1], solution[:, 0],s=10 , c='r', marker='+')
 
     plt.xlim((0,grid.shape[0]-1))
     plt.ylim((0,grid.shape[1]-1))
@@ -481,7 +481,6 @@ def draw_solution_canvas(grid, solution):
     
     # Get start and ending points
     for point in solution:
-            #print('point shape =', point.shape)
             polygon = polygon_from_ego(point, angle=90, l=l, w=w)
             cv2.drawContours(canvas, [polygon], 0, (1,0,0), -1)  #  1: agent present (polygon)  
 

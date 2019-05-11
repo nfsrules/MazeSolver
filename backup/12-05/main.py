@@ -3,14 +3,9 @@
 # Author: Nelson Fernandez, Renault Research
 # nelson.fernandez-pinto@renault.com
 
-import sys,os
-sys.path.append(os.getcwd())
-
 # Imports
 from dataset import *
 from architectures import *
-#from functions import *
-from losses import *
 from sklearn.model_selection import train_test_split
 
 import torch
@@ -24,14 +19,10 @@ torch.manual_seed(7)
 # Generate dataset
 me = MazeExplorer(maze_size=(64,64), nbr_instances=50, 
                   difficulty='easy', nbr_trajectories=20,
-                  alpha=17)
-
-# Show deopping percentages
-me.get_dopping_percentage()  # point level
-me.get_dopping_percentage_trajectories() # trajectory level
+                  alpha=3)
 
 # Create CNN model
-net = ConvNet().to(device)
+net = ConvNet()
 print('CNN created...')
 
 
@@ -50,7 +41,7 @@ train_me = Subset(t_me, indices=train_indexes)
 test_me = Subset(t_me, indices=test_indexes)
 
 # Configure dataloaders
-batch_size = 1
+batch_size = 16
 num_workers = 4
 
 trainloader = DataLoader(train_me, shuffle=True, 
@@ -61,7 +52,7 @@ trainloader = DataLoader(train_me, shuffle=True,
 
 testloader = DataLoader(test_me, shuffle=True, 
                          batch_size=batch_size, 
-                         num_workers=1,
+                         num_workers=1, 
                          pin_memory=True)
 
 print('Train test data loaders created...')
@@ -69,10 +60,9 @@ print('Train test data loaders created...')
 # Init losses
 rmse = RMSELoss()
 graphic_loss = GraphicLoss()
-
 # Set optimizer (Adam)
 optimizer = Adam(net.parameters(), lr=1e-3)
-epochs = 200
+epochs = 15
 print('Losses and optimizer created...')
 
 
@@ -80,70 +70,64 @@ net.train()
 print('Init training loop...')
 
 for epoch in range(1, epochs+1):
-    iters = 0.0
-    total_env = 0.0
-    total_rmse = 0.0
-
-    for batch_idx, (data, target, path, goals, expert_flag) in enumerate(trainloader):
+    running_loss = 0.0
+    for i, (data, target, path, goals, expert_flag) in enumerate(trainloader):
         # Convert X, Y to Torch variables
         grid = data   # save numpy version of maze grid
 
         # Convert input and target to tensors
         data, target = Variable(data), Variable(target)
         data, target = data.to(device).float(), target.to(device).float()
- 
+
         # Set gradient to zero
         optimizer.zero_grad()
 
         # Get network output
         output = net(data)
+        loss = rmse(output.unsqueeze(0), target)
 
-        # RMSE loss
-        rmse_loss = rmse(output, target)
+        if False:
+            # Compute losses 
+            if expert_flag:  # expert trajectory (imitation)
+                loss = rmse(output.unsqueeze(0), target)
 
-        # Environmental Loss
-        grid = grid[0][0].detach().numpy()
-        path = path[0].detach().numpy()
-        goals = goals[0].detach().numpy()
-        output = output[0].detach().cpu().numpy()
+            else:  # non-expert trajectory (environment).detach().numpy()
+                # Maze walls loss (target, prediction)
+                grid = grid[0][0]
+                path = path[0]
+                goals = goals[0]
+                output = output.detach().numpy()[0]
+                #print('out shape', output.shape)
 
-        # Reconstruct predicted grids
-        pred_grid = torch.tensor(draw_solution_canvas(grid, output)).double().to(device)
-        pred_path = torch.tensor(draw_solution_canvas(path, output)).double().to(device)
-        pred_goals = torch.tensor(draw_goals_canvas(grid, output)).double().to(device)
+                # Reconstruct predicted grids
+                pred_grid = torch.tensor(draw_solution_canvas(grid.detach().numpy(), output)).double()
+                pred_path = torch.tensor(draw_solution_canvas(path.detach().numpy(), output)).double()
+                pred_goals = torch.tensor(draw_goals_canvas(grid.detach().numpy(), output)).double()
 
-        # Compute graphic losses
-        # Wall loss
-        wall_loss = graphic_loss(torch.tensor(grid).to(device), pred_grid)
-        # Path planning loss 
-        path_loss = graphic_loss(torch.tensor(path).to(device), pred_path)
-        #path_loss = abs(wall_loss-path_loss)
-        # Goals loss
-        goal_loss = graphic_loss(torch.tensor(goals).to(device), pred_goals)
-        # Non-expert trajectory loss
-        env_loss = Variable((wall_loss + path_loss + goal_loss), requires_grad=True)/10 #
-        
-        # Final loss
-        loss = rmse_loss + env_loss + rmse_loss
-    
+                # Compute graphic losses
+                # Wall loss
+                wall_loss = graphic_loss(grid, pred_grid)
+                # Path planning loss 
+                path_loss = graphic_loss(path, pred_path)
+                path_loss = abs(wall_loss-path_loss)
+                # Goals loss
+                goal_loss = graphic_loss(goals, pred_goals)
+
+                # Final non-expert trajectory loss
+                loss = Variable((wall_loss + path_loss + goal_loss), requires_grad=True)
+
         # Backpropagate loss & udpate gradient
         loss.backward()
         optimizer.step()
 
         # Print information
-        iters += loss
-        total_env+= env_loss
-        total_rmse+= rmse_loss
+        running_loss += loss.item()
 
-        print('Train Epoch: {} [{}/{} ({:.0f}%)] EnvLoss: {:.6f}  RMSELoss: {:.6f} TotalLoss: {:.6f}'.format(
-                    epoch, batch_idx, len(trainloader.dataset),
-                    100. * (batch_idx) / len(trainloader), 
-                    total_env/len(trainloader), 
-                    total_rmse/len(trainloader),
-                    iters/len(trainloader)
-                    ), 
-                    end='\r', flush=True)
-    print("")                                 
-                                     
+        if i % 20 == 19:    # print every 20 mini-batches
+            print('[%d, %5d] loss: %.3f' %
+                  (epoch, i + 1, running_loss / 20))
+            running_loss = 0.0
+                                 
+                                 
 
 

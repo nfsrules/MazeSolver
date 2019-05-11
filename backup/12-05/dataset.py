@@ -72,8 +72,7 @@ class MazeExplorer(Dataset):
         elif self.difficulty == 'medium':
             self.difficulty = [(5,5), (6,6)]
         elif self.difficulty == 'easy':
-            #self.difficulty = [(3,3), (4,4)]
-            self.difficulty = [(4,4)]
+            self.difficulty = [(3,3), (4,4)]
 
         if self.generator == 'prims':
             print('Using Prims generator')
@@ -168,7 +167,7 @@ class MazeExplorer(Dataset):
             total_collisions = total_collisions + collisions
             self.dopping = round((total_collisions/total_points)*100, 3)
 
-        print('Estimated dopping percentage (points) = ', self.dopping)
+        print('Estimated dopping percentage = ', self.dopping)
         return self.dopping
 
 
@@ -179,7 +178,7 @@ class MazeExplorer(Dataset):
             if expert_flag == False:
                 dopping_counter = dopping_counter + 1
         self.dopping = round((dopping_counter/self.len())*100,3)
-        print('Estimated dopping percentage (trajectories)= ', self.dopping)
+        print('Estimated dopping percentage = ', self.dopping)
 
 
     def len(self):

@@ -5,3 +5,7 @@ Maze generator and solver
 https://github.com/theJollySin/mazelib
 
 ## Work in progress
+
+## Train a model
+	python main.py (non-batch ready) 
+	python main_batch.py (batch version)
