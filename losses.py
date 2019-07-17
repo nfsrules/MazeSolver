@@ -6,8 +6,8 @@ from torch.autograd import Variable
 
 import numpy as np
 #from functions import *
-#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#torch.manual_seed(7)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+torch.manual_seed(7)
 
 #class RMSELoss(nn.Module):
 #    def __init__(self, eps=1e-10):
@@ -194,7 +194,7 @@ class RoadLoss(nn.Module):
         for point in prediction:
             # Check if it is outside the frame
             if is_outside_frame(hd_map, point):  # True if the prediction is outside
-                pred_loss.append(Variable(torch.tensor(0).float()))  # Do not calculate losses in this case
+                pred_loss.append(Variable(torch.tensor(0).float().to(device)))  # Do not calculate losses in this case
 
             else: # the  point is inside  the  canvas
                 # Check if prediction is in drivable area
@@ -203,33 +203,33 @@ class RoadLoss(nn.Module):
                     # invert mask
                     image = hd_map*-1+1
                     # Find nearest drivable pixel
-                    nonzero = (image.nonzero()).float()
+                    nonzero = (image.nonzero()).float().to(device)
                     # Calculate distances using L2
-                    distances = torch.sqrt((nonzero[:,0]-point[0].float())** 2 + 
-                                           (nonzero[:,1]-point[1].float())** 2)
+                    distances = torch.sqrt((nonzero[:,0]-point[0].float().to(device))** 2 + 
+                                           (nonzero[:,1]-point[1].float().to(device))** 2)
                     
                     # Get shortest drivable point
                     nearest_index = torch.argmin(distances)
                     # find euclidean distance L2 (prediction and drivable point)
-                    distance = torch.dist(nonzero[nearest_index], point.float())
+                    distance = torch.dist(nonzero[nearest_index], point.float().to(device))
                     # Calculate loss and append /  growing exponential
-                    pred_loss.append(torch.exp(distance*(torch.log(torch.tensor(2).float())/self.k2))-1)
+                    pred_loss.append(torch.exp(distance*(torch.log(torch.tensor(2).float().to(device))/self.k2))-1)
 
                 else:  # prediction is inside drivable area
                     # Calculate loss (decreasing exponential)
                     # Find nearest non-drivable pixel
-                    nonzero = (hd_map.nonzero()).float()
+                    nonzero = (hd_map.nonzero()).float().to(device)
                     # Calculate distances L2
-                    distances = torch.sqrt((nonzero[:,0]-point[0].float())** 2 + 
-                                           (nonzero[:,1]-point[1].float())** 2)
+                    distances = torch.sqrt((nonzero[:,0]-point[0].float().to(device))** 2 + 
+                                           (nonzero[:,1]-point[1].float().to(device))** 2)
                     
                     # Get shortest distance
                     nearest_index = torch.argmin(distances)
                     # find euclidean distance L2 (prediction and non-drivable point)
-                    distance = torch.dist(nonzero[nearest_index], point.float())
+                    distance = torch.dist(nonzero[nearest_index], point.float().to(device))
                     # Calculate loss and append /  decreasing exponential
                     pred_loss.append(torch.exp(-1*distance**2/self.k1))
 
-        return Variable(torch.tensor(pred_loss).mean())
+        return Variable(torch.tensor(pred_loss).to(device).mean())
 
 
