@@ -158,7 +158,7 @@ def is_outside_road(im, point):
     '''Check if a point is outside drivable area.
     
     '''
-    neighbors = im[point[0]-1:point[0]+1, point[1]-1:point[1]+1].flatten()
+    neighbors = im[point[1]-1:point[1]+1, point[0]-1:point[0]+1].flatten()
     if 1 in neighbors:
         flag = True
     else:
@@ -231,5 +231,63 @@ class RoadLoss(nn.Module):
                     pred_loss.append(torch.exp(-1*distance**2/self.k1))
 
         return Variable(torch.tensor(pred_loss).to(device).mean())
+
+
+
+class GaussianLoss(nn.Module):
+    '''Calculate collision Loss between ego and a bounding box.
+    
+    map_size: Image size Tuple example (150,150)
+    height: Max value of the loss at the center of a bounding box
+    step: Step resolution to calculate loss. Default 1 pixel
+    narrow: Reduce variance of the Gaussian by 2 (95%). Default False
+    plot: Plot the resulting loss function. Default False
+    
+    '''
+    def __init__(self, map_size, height, step=1, narrow=False, plot=False):
+        super().__init__()
+        self.height = height 
+        self.narrow = narrow
+        self.plot = plot
+        # Create a mesh gride of map size
+        grid = torch.meshgrid([torch.arange(0, map_size[0], step),
+                                 torch.arange(0, map_size[1], step)])
+        # Torch meshgrid output is not the same as numpy  / correction
+        self.grid = [grid[0][:,0].reshape(1,-1).float().to(device), 
+                     grid[0][:,0].reshape(1,-1).t().float().to(device)]
+    
+    def forward(self, prediction, boxes):
+        # Calculate a 2D Gaussian loss grid for each actor in the scene
+        losses = []
+        for box in boxes:
+            # Unpack actor bounding box
+            x0, y0 = torch.tensor(box['coordinates']).float().to(device)  # non normalized coordinates
+            theta = torch.tensor(box['angle']).float().to(device) # In radians
+            # We use the bounding box size as covariance in each axis
+            sigma_X, h, sigma_Y = torch.tensor(box['whl']).float().to(device)  # box WHL in pixels
+            
+            if self.narrow:
+                sigma_X = sigma_X/2
+                sigma_Y = sigma_Y/2
+            
+            # Generate 2D-Gaussian loss custom parameters
+            a = (torch.cos(theta)**2/(2*sigma_X**2)) + (torch.sin(theta)**2/(2*sigma_Y**2))
+            b = (-1*torch.sin(2*theta)/(4*sigma_X**2)) + (torch.sin(2*theta)/(4*sigma_Y**2))
+            c = (torch.sin(theta)**2/(2*sigma_X**2)) + (torch.cos(theta)**2/(2*sigma_Y**2))
+            g = -1*(a*(self.grid[0]-x0)**2 + 2*b*(self.grid[0]-x0)*(self.grid[1]-y0) + c*(self.grid[1]-y0)**2)
+            losses.append(self.height*torch.exp(g))
+            
+        # The final loss function is the superposition of individual losses    
+        loss_function = torch.stack(losses, dim=0).sum(dim=0)
+        
+        if self.plot:
+            plt.imshow(loss_function)
+            for point in prediction:
+                plt.scatter(point[0], point[1], marker='x', c='r')
+
+        # For each prediction point estimate the loss due to each obstacle
+        loss = [loss_function[point[1], point[0]] for point in prediction]
+        print(loss)
+        return torch.tensor(loss).mean()
 
 
