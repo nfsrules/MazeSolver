@@ -213,7 +213,7 @@ class RoadLoss(nn.Module):
                     # find euclidean distance L2 (prediction and drivable point)
                     distance = torch.dist(nonzero[nearest_index], point.float().to(device))
                     # Calculate loss and append /  growing exponential
-                    pred_loss.append(torch.exp(distance*(torch.log(torch.tensor(2).float().to(device))/self.k2))-1)
+                    pred_loss.append(torch.exp(distance*(torch.log(torch.tensor(2).float().to(device))/self.k2)))
 
                 else:  # prediction is inside drivable area
                     # Calculate loss (decreasing exponential)
